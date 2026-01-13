@@ -37,9 +37,11 @@ ENV/
 # Xcode / Swift
 ## User settings
 xcuserdata/
+*.xcuserdatad/
 
 ## DerivedData
 DerivedData/
+build/
 
 ## Obj-C/Swift specific
 *.hmap
@@ -58,3 +60,8 @@ playground.xcworkspace
 .build/
 Packages
 .swiftpm/xcode/package.xcstrings
+*.xcworkspace/xcuserdata/
+
+# iOS
+Pods/
+Podfile.lock

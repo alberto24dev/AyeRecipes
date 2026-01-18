@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BaseModel, Field, BeforeValidator, EmailStr
 from typing import Optional, List, Annotated
 from datetime import datetime
 
@@ -12,6 +12,7 @@ class RecipeModel(BaseModel):
     description: Optional[str] = None
     ingredients: List[str] = []
     steps: List[str] = []
+    user_id: Optional[PyObjectId] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.now)
 
     class Config:
@@ -30,3 +31,37 @@ class UpdateRecipeModel(BaseModel):
     description: Optional[str] = None
     ingredients: Optional[List[str]] = None
     steps: Optional[List[str]] = None
+
+# --- Modelos de Autenticación ---
+
+class UserModel(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    email: EmailStr = Field(..., unique=True)
+    password: str = Field(..., min_length=6)
+    name: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    class Config:
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "email": "usuario@example.com",
+                "password": "password123",
+                "name": "Juan Pérez"
+            }
+        }
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class LoginResponse(BaseModel):
+    success: bool
+    message: str
+    user: Optional[dict] = None
+    token: Optional[str] = None
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str

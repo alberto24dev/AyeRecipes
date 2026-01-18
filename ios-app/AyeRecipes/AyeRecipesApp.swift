@@ -11,6 +11,7 @@ import SwiftUI
 struct AyeRecipesApp: App {
     var body: some Scene {
         WindowGroup {
+            // Solo llamamos a ContentView, que ya tiene la lógica del "semáforo" adentro
             ContentView()
         }
     }

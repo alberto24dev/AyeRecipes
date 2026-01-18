@@ -17,12 +17,27 @@ struct RecipeStepItem: Identifiable, Hashable, Codable {
     }
 }
 
+struct IngredientItem: Identifiable, Hashable {
+    let id: UUID
+    var name: String
+    var quantity: String
+    var unit: String
+    
+    init(name: String, quantity: String, unit: String) {
+        self.id = UUID()
+        self.name = name
+        self.quantity = quantity
+        self.unit = unit
+    }
+}
+
 struct CreateRecipeView: View {
     @EnvironmentObject var recipeService: RecipeService
     
     // NUEVO: Enum para controlar qué campo tiene el foco (teclado activo)
     enum Field: Hashable {
         case ingredient
+        case quantity
         case step
     }
     
@@ -32,104 +47,162 @@ struct CreateRecipeView: View {
     @State private var title = ""
     @State private var description = ""
     
-    @State private var newIngredient = ""
-    @State private var ingredients: [String] = []
+    @State private var newIngredientName = ""
+    @State private var newIngredientQuantity = ""
+    @State private var newIngredientUnit = "g"
+    @State private var ingredients: [IngredientItem] = []
+    
+    let units = ["g", "kg", "ml", "L", "cups", "tbsp", "tsp"]
     
     @State private var newStep = ""
     @State private var steps: [RecipeStepItem] = []
     
     @State private var isSaving = false
-    @State private var showAlert = false
-    @State private var alertMessage = ""
+    @State private var showResultOverlay = false
+    @State private var saveSuccess: Bool? = nil
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Información")) {
-                    TextField("Título de la receta", text: $title)
-                    TextField("Descripción breve", text: $description, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-                
-                // MARK: - Sección Ingredientes
-                Section(header: Text("Ingredientes")) {
-                    HStack {
-                        TextField("Agregar ingrediente", text: $newIngredient)
-                            .focused($focusedField, equals: .ingredient) // Vincula el foco
-                            .submitLabel(.next) // Cambia visualmente el botón a "Siguiente" o "Enter"
-                            .onSubmit {
-                                addIngredient()
-                                // NUEVO: Mantiene el foco aquí tras dar Enter
-                                focusedField = .ingredient
-                            }
-                        
-                        Button(action: addIngredient) {
-                            Image(systemName: "plus.circle.fill")
-                        }
-                        .disabled(newIngredient.isEmpty)
+            ZStack {
+                Form {
+                    Section(header: Text("Information")) {
+                        TextField("Recipe Title", text: $title)
+                        TextField("Short description", text: $description, axis: .vertical)
+                            .lineLimit(3...6)
                     }
                     
-                    ForEach(ingredients, id: \.self) { ingredient in
-                        Text(ingredient)
-                    }
-                    .onDelete(perform: deleteIngredient)
-                    .onMove(perform: moveIngredient) // NUEVO: Permite reordenar
-                }
-                
-                // MARK: - Sección Pasos
-                Section(header: Text("Pasos")) {
-                    HStack {
-                        TextField("Agregar paso", text: $newStep)
-                            .focused($focusedField, equals: .step) // Vincula el foco
-                            .submitLabel(.next)
-                            .onSubmit {
-                                addStep()
-                                // NUEVO: Mantiene el foco aquí tras dar Enter
-                                focusedField = .step
+                    // MARK: - Sección Ingredientes
+                    Section(header: Text("Ingredients")) {
+                        HStack {
+                            TextField("Ingredient", text: $newIngredientName)
+                                .focused($focusedField, equals: .ingredient)
+                                .submitLabel(.next)
+                                .onSubmit {
+                                    focusedField = .quantity
+                                }
+                            
+                            Divider()
+                            
+                            TextField("Qty", text: $newIngredientQuantity)
+                                .multilineTextAlignment(.trailing)
+                                .focused($focusedField, equals: .quantity)
+                                .keyboardType(.decimalPad)
+                                .frame(width: 50)
+                                .submitLabel(.done)
+                                .onSubmit {
+                                    addIngredient()
+                                    focusedField = .ingredient
+                                }
+                            
+                            Picker("", selection: $newIngredientUnit) {
+                                ForEach(units, id: \.self) { unit in
+                                    Text(unit).tag(unit)
+                                }
                             }
-                        
-                        Button(action: addStep) {
-                            Image(systemName: "plus.circle.fill")
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 66)
+                            
+                            Button(action: addIngredient) {
+                                Image(systemName: "plus.circle.fill")
+                            }
+                            .disabled(newIngredientName.isEmpty)
                         }
-                        .disabled(newStep.isEmpty)
+                        
+                        ForEach(ingredients) { item in
+                            HStack {
+                                Text(item.name)
+                                Spacer()
+                                Text("\(item.quantity) \(item.unit)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .onDelete(perform: deleteIngredient)
+                        .onMove(perform: moveIngredient) // NUEVO: Permite reordenar
                     }
                     
-                    ForEach(steps) { step in
-                        HStack(alignment: .top) {
-                            Text("\(getIndex(for: step) + 1).")
-                                .bold()
-                                .foregroundStyle(.secondary)
-                            Text(step.text)
+                    // MARK: - Sección Pasos
+                    Section(header: Text("Steps")) {
+                        HStack {
+                            TextField("Add step", text: $newStep)
+                                .focused($focusedField, equals: .step) // Vincula el foco
+                                .submitLabel(.next)
+                                .onSubmit {
+                                    addStep()
+                                    // NUEVO: Mantiene el foco aquí tras dar Enter
+                                    focusedField = .step
+                                }
+                            
+                            Button(action: addStep) {
+                                Image(systemName: "plus.circle.fill")
+                            }
+                            .disabled(newStep.isEmpty)
                         }
+                        
+                        ForEach(steps) { step in
+                            HStack(alignment: .top) {
+                                Text("\(getIndex(for: step) + 1).")
+                                    .bold()
+                                    .foregroundStyle(.secondary)
+                                Text(step.text)
+                            }
+                        }
+                        .onDelete(perform: deleteStep)
+                        .onMove(perform: moveStep) // Ya existente
                     }
-                    .onDelete(perform: deleteStep)
-                    .onMove(perform: moveStep) // Ya existente
+                    
+                    Section {
+                        Button(action: saveRecipe) {
+                            ZStack {
+                                Text("Save Recipe")
+                                    .frame(maxWidth: .infinity)
+                                    .opacity(isSaving ? 0 : 1)
+                                
+                                if isSaving {
+                                    ProgressView()
+                                        .tint(.white)
+                                }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(saveSuccess == nil ? nil : (saveSuccess == true ? .green : .red))
+                        .disabled(title.isEmpty || isSaving)
+                    }
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .navigationTitle("Create Recipe")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        EditButton()
+                    }
                 }
                 
-                Section {
-                    Button(action: saveRecipe) {
-                        if isSaving {
-                            ProgressView()
-                        } else {
-                            Text("Guardar Receta")
-                                .frame(maxWidth: .infinity)
-                        }
+                // Overlay de resultado (Éxito o Error)
+                if showResultOverlay {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                    
+                    VStack(spacing: 16) {
+                        Image(systemName: (saveSuccess == true) ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor((saveSuccess == true) ? .green : .red)
+                        
+                        Text((saveSuccess == true) ? "Saved!" : "Error")
+                            .font(.headline)
+                        
+                        Text((saveSuccess == true) ? "Recipe created successfully" : "Could not save recipe")
+                            .font(.subheadline)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.secondary)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(title.isEmpty || isSaving)
+                    .padding(24)
+                    .frame(width: 200)
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(20)
+                    .shadow(radius: 10)
+                    .transition(.scale.combined(with: .opacity))
                 }
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Crear Receta")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-            }
-            .alert("Estado", isPresented: $showAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(alertMessage)
             }
         }
     }
@@ -137,9 +210,12 @@ struct CreateRecipeView: View {
     // MARK: - Funciones
     
     func addIngredient() {
-        guard !newIngredient.isEmpty else { return }
-        ingredients.append(newIngredient)
-        newIngredient = ""
+        guard !newIngredientName.isEmpty else { return }
+        let quantity = newIngredientQuantity.isEmpty ? "1" : newIngredientQuantity
+        ingredients.append(IngredientItem(name: newIngredientName, quantity: quantity, unit: newIngredientUnit))
+        newIngredientName = ""
+        newIngredientQuantity = ""
+        newIngredientUnit = "g"
         // No ponemos 'focusedField = nil' para que el teclado siga abierto
     }
     
@@ -175,25 +251,42 @@ struct CreateRecipeView: View {
         focusedField = nil
         
         isSaving = true
+        saveSuccess = nil
+        
         Task {
             let success = await recipeService.createRecipe(
                 title: title,
                 description: description,
-                ingredients: ingredients,
+                ingredients: ingredients.map { "\($0.quantity) \($0.unit) \($0.name)" },
                 steps: steps.map { $0.text }
             )
             
             isSaving = false
+            saveSuccess = success
+            
             if success {
-                alertMessage = "Receta guardada exitosamente"
                 title = ""
                 description = ""
                 ingredients = []
                 steps = []
-            } else {
-                alertMessage = "Error al guardar la receta"
+                newIngredientName = ""
+                newIngredientQuantity = ""
             }
-            showAlert = true
+            
+            withAnimation {
+                showResultOverlay = true
+            }
+            
+            // Ocultar el mensaje después de 2 segundos
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation {
+                    showResultOverlay = false
+                }
+                // Resetear el color del botón poco después
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    saveSuccess = nil
+                }
+            }
         }
     }
 }

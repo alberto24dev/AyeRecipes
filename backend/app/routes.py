@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Body, HTTPException, status
+from fastapi import APIRouter, Body, HTTPException, status, Depends
 from fastapi.responses import Response
 from typing import List
 from bson import ObjectId
 from pymongo import ReturnDocument
 
-from app.database import recipe_collection
+from app.database import recipe_collection, user_collection
 from app.models import RecipeModel, UpdateRecipeModel
+from app.auth import get_current_user
 
 # Creamos el enrutador
 router = APIRouter()
@@ -29,12 +30,20 @@ async def test_db_connection():
 # --- Endpoints CRUD de Recetas ---
 
 @router.post("/recipes", response_description="Añadir nueva receta", response_model=RecipeModel, status_code=status.HTTP_201_CREATED)
-async def create_recipe(recipe: RecipeModel = Body(...)):
+async def create_recipe(recipe: RecipeModel = Body(...), current_user_email: str = Depends(get_current_user)):
     """
-    Crea una nueva receta en la base de datos.
+    Crea una nueva receta en la base de datos ligada al usuario autenticado.
     """
+    # Obtener el ID del usuario actual
+    user = await user_collection.find_one({"email": current_user_email})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
     # Convertimos el modelo a diccionario, excluyendo nulos y el id (que genera Mongo)
     recipe_dict = recipe.model_dump(by_alias=True, exclude=["id"])
+    
+    # Agregamos el user_id
+    recipe_dict["user_id"] = user["_id"]
     
     new_recipe = await recipe_collection.insert_one(recipe_dict)
     
@@ -42,12 +51,18 @@ async def create_recipe(recipe: RecipeModel = Body(...)):
     created_recipe = await recipe_collection.find_one({"_id": new_recipe.inserted_id})
     return created_recipe
 
-@router.get("/recipes", response_description="Listar todas las recetas", response_model=List[RecipeModel])
-async def list_recipes():
+@router.get("/recipes", response_description="Listar todas las recetas del usuario", response_model=List[RecipeModel])
+async def list_recipes(current_user_email: str = Depends(get_current_user)):
     """
-    Obtiene una lista de todas las recetas (limitado a 100 por seguridad).
+    Obtiene una lista de las recetas del usuario autenticado (limitado a 100 por seguridad).
     """
-    recipes = await recipe_collection.find().to_list(100)
+    # Obtener el ID del usuario actual
+    user = await user_collection.find_one({"email": current_user_email})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Filtrar recetas por user_id
+    recipes = await recipe_collection.find({"user_id": user["_id"]}).to_list(100)
     return recipes
 
 @router.get("/recipes/{id}", response_description="Obtener una receta", response_model=RecipeModel)

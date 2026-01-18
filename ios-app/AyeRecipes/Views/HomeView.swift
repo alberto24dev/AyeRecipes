@@ -12,9 +12,10 @@ struct HomeView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
+            ZStack {
+                ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Resumen de Recetas")
+                    Text("Recipes Summary")
                         .font(.title2)
                         .bold()
                         .padding(.horizontal)
@@ -28,11 +29,14 @@ struct HomeView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 15) {
                                 ForEach(recipeService.recipes.prefix(5)) { recipe in
-                                    RecipeSummaryCard(title: recipe.title)
+                                    NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                                        RecipeSummaryCard(title: recipe.title)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                                 
                                 if recipeService.recipes.isEmpty {
-                                    Text("No hay recetas aún")
+                                    Text("No recipes yet")
                                         .foregroundStyle(.secondary)
                                         .padding()
                                 }
@@ -41,41 +45,86 @@ struct HomeView: View {
                         }
                     }
                     
-                    Text("Recientes")
+                    Text("Recent")
                         .font(.headline)
                         .padding(.horizontal)
                     
                     // Lista de recetas recientes (tomamos las ultimas 3 o las primeras 3)
                     VStack(spacing: 16) {
                         ForEach(recipeService.recipes.prefix(3)) { recipe in
-                            HStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 60, height: 60)
-                                    .overlay {
-                                        Image(systemName: "fork.knife")
-                                            .foregroundStyle(.white)
+                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                                HStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 60, height: 60)
+                                        .overlay {
+                                            Image(systemName: "fork.knife")
+                                                .foregroundStyle(.white)
+                                        }
+                                    VStack(alignment: .leading) {
+                                        Text(recipe.title)
+                                            .font(.subheadline)
+                                            .bold()
+                                            .foregroundStyle(.primary)
+                                        Text(recipe.description ?? "No description")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
                                     }
-                                VStack(alignment: .leading) {
-                                    Text(recipe.title)
-                                        .font(.subheadline)
-                                        .bold()
-                                    Text(recipe.description ?? "Sin descripción")
-                                        .font(.caption)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(1)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(.secondary)
+                                .padding(.horizontal)
                             }
-                            .padding(.horizontal)
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                     
                     Spacer()
                 }
                 .padding(.top)
+            }
+            
+            // Overlay de mensajes (Éxito o Error)
+            if let message = recipeService.successMessage ?? recipeService.errorMessage {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            withAnimation {
+                                if recipeService.successMessage != nil {
+                                    recipeService.successMessage = nil
+                                }
+                                if recipeService.errorMessage != nil {
+                                    recipeService.errorMessage = nil
+                                }
+                            }
+                        }
+                    }
+                
+                VStack(spacing: 16) {
+                    Image(systemName: recipeService.successMessage != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(recipeService.successMessage != nil ? .green : .red)
+                    
+                    Text(recipeService.successMessage != nil ? "Saved!" : "Error")
+                        .font(.headline)
+                    
+                    Text(message)
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                }
+                .padding(24)
+                .frame(width: 200)
+                .background(Color(UIColor.systemBackground))
+                .cornerRadius(20)
+                .shadow(radius: 10)
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(100)
+            }
             }
             .navigationTitle("AyeRecipes")
             .task {

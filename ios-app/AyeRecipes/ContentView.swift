@@ -1,36 +1,21 @@
-//
-//  ContentView.swift
-//  AyeRecipes
-//
-//  Created by Jose Alberto Montero Martinez on 1/11/26.
-//
-
 import SwiftUI
-import Foundation
 
 struct ContentView: View {
-    @StateObject private var recipeService = RecipeService()
+    // AQUÍ SE CREA EL SERVICIO UNA SOLA VEZ PARA TODA LA APP
+    @StateObject private var authService = AuthService()
     
     var body: some View {
-        TabView {
-
-            CreateRecipeView()
-                .tabItem {
-                    Label("Crear", systemImage: "plus.circle.fill")
-                }        
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house")
-                }
-
-            RecipesListView()
-                .tabItem {
-                    Label("Recetas", systemImage: "list.bullet")
-                }
+        Group {
+            if authService.isAuthenticated {
+                // Si está autenticado, mostramos las pestañas (Tu código anterior)
+                MainTabView()
+                    .environmentObject(authService) // Le pasamos el servicio para poder hacer Logout después
+            } else {
+                // Si NO está autenticado, mostramos el Login
+                LoginView(authService: authService)
+            }
         }
-        .tabViewStyle(.sidebarAdaptable)
-        .environmentObject(recipeService)
-        .tint(Color(red: 1.0, green: 0.27, blue: 0.0))
+        .animation(.easeInOut, value: authService.isAuthenticated)
     }
 }
 

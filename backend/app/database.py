@@ -12,6 +12,7 @@ DB_NAME = os.environ.get("DB_NAME")
 client = AsyncIOMotorClient(MONGO_URL)
 database = client[DB_NAME]
 recipe_collection = database.get_collection("recipes")
+user_collection = database.get_collection("users")
 
 # Función auxiliar para verificar conexión (opcional, útil para debug)
 async def check_db_connection():

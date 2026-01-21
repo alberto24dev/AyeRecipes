@@ -14,15 +14,14 @@
 backend/**/*.py
 
 # Permitir solo archivos .swift en ios-app
-ios-app/**/*.swift
-
-ios-app/AyeRecipes/providers
+ios-app/*.swift
+ios-app/AyeRecipes/Providers/*.swift
 
 # Ignorar entornos virtuales y dependencias
 backend/AyeRecipes/
 
 # Ignorar recursos y assets
-assets/*
+assets/
 ios-app/AyeRecipes/Assets.xcassets/
 
 # Ignorar archivos de proyecto de Xcode

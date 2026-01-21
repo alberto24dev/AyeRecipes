@@ -85,24 +85,17 @@ struct RecipesListView: View {
     }
     
     func deleteRecipe(at offsets: IndexSet) {
-        // Necesitamos obtener los IDs de las recetas que se van a eliminar
-        // pero .onDelete nos da índices.
-        
-        // Hacemos una copia de los items a eliminar para procesarlos
         let recipesToDelete = offsets.map { recipeService.recipes[$0] }
-        
-        // Eliminamos de la lista localmente primero (optimista) o esperamos a la API
-        // SwiftUI espera que actualicemos el modelo en el closure de onDelete usualmente,
-        // o si es asíncrono, puede ser tricky.
-        
-        // Sin embargo, como tenemos RecipeService como ObservableObject y @Published recipes,
-        // podemos llamar al servicio.
-        
         Task {
+            var anyError = false
             for recipe in recipesToDelete {
                 if let id = recipe.id {
-                    await recipeService.deleteRecipe(id: id)
+                    let success = await recipeService.deleteRecipe(id: id)
+                    if !success { anyError = true }
                 }
+            }
+            if anyError {
+                recipeService.errorMessage = "One or more recipes could not be deleted."
             }
         }
     }

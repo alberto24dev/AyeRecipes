@@ -1,67 +1,37 @@
-# General
-.DS_Store
-.AppleDouble
-.LSOverride
+###############################
+# SOLO SUBIR CÓDIGO FUENTE   #
+# .py y .swift               #
+###############################
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Ignorar todo por defecto
+/*
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.env
-.venv/
+# Permitir carpetas de código
+!backend/
+!ios-app/
 
-# Xcode / Swift
-## User settings
-xcuserdata/
-*.xcuserdatad/
+# Permitir solo archivos .py en backend
+backend/**/*.py
 
-## DerivedData
-DerivedData/
-build/
+# Permitir solo archivos .swift en ios-app
+ios-app/**/*.swift
 
-## Obj-C/Swift specific
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
+# Ignorar entornos virtuales y dependencias
+backend/AyeRecipes/
 
-## Playground
-timeline.xctimeline
-playground.xcworkspace
+# Ignorar recursos y assets
+assets/
+ios-app/AyeRecipes/Assets.xcassets/
 
-# Xcode CoreData
-*.xcdatamodel/
+# Ignorar archivos de proyecto de Xcode
+ios-app/AyeRecipes.xcodeproj/
+ios-app/AyeRecipes.xcodeproj/**
+ios-app/AyeRecipes.xcworkspace/
+ios-app/AyeRecipes.xcworkspace/**
+ios-app/xcuserdata/
 
-# Swift Package Manager
-.build/
-Packages
-.swiftpm/xcode/package.xcstrings
-*.xcworkspace/xcuserdata/
+# Ignorar archivos y carpetas ocultas
+.*
 
-# iOS
-Pods/
-Podfile.lock
+# Permitir el propio .gitignore
+!.gitignore

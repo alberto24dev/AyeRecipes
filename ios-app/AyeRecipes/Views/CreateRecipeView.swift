@@ -34,6 +34,10 @@ struct IngredientItem: Identifiable, Hashable {
 struct CreateRecipeView: View {
     @EnvironmentObject var recipeService: RecipeService
     
+    // Estado para controlar modo de edición
+    @State private var isEditingIngredients = false
+    @State private var isEditingSteps = false
+    
     // NUEVO: Enum para controlar qué campo tiene el foco (teclado activo)
     enum Field: Hashable {
         case ingredient
@@ -52,7 +56,7 @@ struct CreateRecipeView: View {
     @State private var newIngredientUnit = "g"
     @State private var ingredients: [IngredientItem] = []
     
-    let units = ["g", "kg", "ml", "L", "cups", "tbsp", "tsp"]
+    let units = ["g", "kg", "ml", "L", "cups", "tbsp", "tsp","Unit"]
     
     @State private var newStep = ""
     @State private var steps: [RecipeStepItem] = []
@@ -60,6 +64,9 @@ struct CreateRecipeView: View {
     @State private var isSaving = false
     @State private var showResultOverlay = false
     @State private var saveSuccess: Bool? = nil
+    
+    @State private var showEditConfirmation = false
+    @State private var lastEditMode: EditMode = .inactive
     
     var body: some View {
         NavigationView {
@@ -72,7 +79,16 @@ struct CreateRecipeView: View {
                     }
                     
                     // MARK: - Sección Ingredientes
-                    Section(header: Text("Ingredients")) {
+                    Section(header: HStack {
+                        Text("Ingredients")
+                        Spacer()
+                        if !ingredients.isEmpty {
+                            Button(action: { isEditingIngredients.toggle() }) {
+                                Text(isEditingIngredients ? "Done" : "Edit")
+                                    .font(.caption)
+                            }
+                        }
+                    }) {
                         HStack {
                             TextField("Ingredient", text: $newIngredientName)
                                 .focused($focusedField, equals: .ingredient)
@@ -80,20 +96,22 @@ struct CreateRecipeView: View {
                                 .onSubmit {
                                     focusedField = .quantity
                                 }
-                            
                             Divider()
-                            
                             TextField("Qty", text: $newIngredientQuantity)
                                 .multilineTextAlignment(.trailing)
                                 .focused($focusedField, equals: .quantity)
                                 .keyboardType(.decimalPad)
                                 .frame(width: 50)
                                 .submitLabel(.done)
+                                .onChange(of: newIngredientQuantity, initial: false) { oldValue, newValue in
+                                    if newValue.contains("/") {
+                                        newIngredientUnit = "Unit"
+                                    }
+                                }
                                 .onSubmit {
                                     addIngredient()
                                     focusedField = .ingredient
                                 }
-                            
                             Picker("", selection: $newIngredientUnit) {
                                 ForEach(units, id: \.self) { unit in
                                     Text(unit).tag(unit)
@@ -102,53 +120,92 @@ struct CreateRecipeView: View {
                             .labelsHidden()
                             .pickerStyle(.menu)
                             .frame(maxWidth: 66)
-                            
+                            .disabled(newIngredientQuantity.contains("/"))
                             Button(action: addIngredient) {
                                 Image(systemName: "plus.circle.fill")
                             }
                             .disabled(newIngredientName.isEmpty)
                         }
-                        
-                        ForEach(ingredients) { item in
-                            HStack {
-                                Text(item.name)
-                                Spacer()
-                                Text("\(item.quantity) \(item.unit)")
-                                    .foregroundStyle(.secondary)
+                        ForEach(ingredients.indices, id: \.self) { idx in
+                            let item = ingredients[idx]
+                            Group {
+                                if isEditingIngredients {
+                                    // Modo edición: permite cambiar nombre, cantidad y unidad
+                                    HStack {
+                                        TextField("Name", text: $ingredients[idx].name)
+                                        Divider()
+                                        TextField("Qty", text: $ingredients[idx].quantity)
+                                            .keyboardType(.decimalPad)
+                                            .frame(width: 50)
+                                            .onChange(of: ingredients[idx].quantity, initial: false) { oldValue, newValue in
+                                                if newValue.contains("/") {
+                                                    ingredients[idx].unit = "Unit"
+                                                }
+                                            }
+                                        Picker("", selection: $ingredients[idx].unit) {
+                                            ForEach(units, id: \.self) { unit in
+                                                Text(unit).tag(unit)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .pickerStyle(.menu)
+                                        .frame(maxWidth: 66)
+                                        .disabled(ingredients[idx].quantity.contains("/"))
+                                    }
+                                } else {
+                                    // Modo visualización
+                                    HStack {
+                                        Text(item.name)
+                                        Spacer()
+                                        Text("\(item.quantity) \(item.unit)")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                         .onDelete(perform: deleteIngredient)
-                        .onMove(perform: moveIngredient) // NUEVO: Permite reordenar
+                        .onMove(perform: moveIngredient)
                     }
                     
                     // MARK: - Sección Pasos
-                    Section(header: Text("Steps")) {
+                    Section(header: HStack {
+                        Text("Steps")
+                        Spacer()
+                        if !steps.isEmpty {
+                            Button(action: { isEditingSteps.toggle() }) {
+                                Text(isEditingSteps ? "Done" : "Edit")
+                                    .font(.caption)
+                            }
+                        }
+                    }) {
                         HStack {
                             TextField("Add step", text: $newStep)
-                                .focused($focusedField, equals: .step) // Vincula el foco
+                                .focused($focusedField, equals: .step)
                                 .submitLabel(.next)
                                 .onSubmit {
                                     addStep()
-                                    // NUEVO: Mantiene el foco aquí tras dar Enter
                                     focusedField = .step
                                 }
-                            
                             Button(action: addStep) {
                                 Image(systemName: "plus.circle.fill")
                             }
                             .disabled(newStep.isEmpty)
                         }
-                        
-                        ForEach(steps) { step in
+                        ForEach(steps.indices, id: \.self) { idx in
+                            let step = steps[idx]
                             HStack(alignment: .top) {
-                                Text("\(getIndex(for: step) + 1).")
+                                Text("\(idx + 1).")
                                     .bold()
                                     .foregroundStyle(.secondary)
-                                Text(step.text)
+                                if isEditingSteps {
+                                    TextField("Step", text: $steps[idx].text)
+                                } else {
+                                    Text(step.text)
+                                }
                             }
                         }
                         .onDelete(perform: deleteStep)
-                        .onMove(perform: moveStep) // Ya existente
+                        .onMove(perform: moveStep)
                     }
                     
                     Section {
@@ -171,11 +228,6 @@ struct CreateRecipeView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .navigationTitle("Create Recipe")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        EditButton()
-                    }
-                }
                 
                 // Overlay de resultado (Éxito o Error)
                 if showResultOverlay {
@@ -240,10 +292,6 @@ struct CreateRecipeView: View {
     
     func moveStep(from source: IndexSet, to destination: Int) {
         steps.move(fromOffsets: source, toOffset: destination)
-    }
-    
-    func getIndex(for step: RecipeStepItem) -> Int {
-        return steps.firstIndex(where: { $0.id == step.id }) ?? 0
     }
     
     func saveRecipe() {

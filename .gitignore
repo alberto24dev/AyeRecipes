@@ -26,7 +26,7 @@ assets/*
 ios-app/AyeRecipes/Assets.xcassets/
 
 # Ignorar archivos de proyecto de Xcode
-ios-app/AyeRecipes.xcodeproj/*
+ios-app/AyeRecipes.xcodeproj/
 
 # Ignorar archivos y carpetas ocultas
 .*

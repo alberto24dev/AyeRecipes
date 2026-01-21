@@ -2,41 +2,34 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copiar requirements desde backend
-COPY backend/requirements.txt .
+COPY requirements.txt .
 
-# Instalar dependencias
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código desde backend/app
-COPY backend/app ./app
+COPY ./app ./app
 
-# Exponer el puerto
 EXPOSE 8000
 
-# Comando para ejecutar
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## ¿Cuál estructura tienes en GitHub?
+## Pasos para debuggear:
 
-Dime si tu repositorio se ve así:
-```
-AYERECIPES/
-├── backend/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── app/
-│       └── ...
-└── ios-app/
-```
+1. **Haz clic en "Build Logs"** (segunda pestaña arriba) y muéstrame qué dice
 
-O así:
+2. Mientras tanto, verifica en tu repositorio de GitHub que:
+   - ✅ `backend/Dockerfile` existe
+   - ✅ `backend/requirements.txt` existe
+   - ✅ `backend/app/main.py` existe
+
+3. Si no ves los logs, intenta hacer un **nuevo deploy manual**:
+   - Ve a **Deployments** (primera pestaña)
+   - Haz clic en los 3 puntos `...` al lado derecho
+   - Selecciona **"Redeploy"**
+
+4. También revisa que tu `.gitignore` **NO esté bloqueando** estos archivos:
 ```
-AYERECIPES/
-├── Dockerfile
-├── requirements.txt
-├── app/
-│   └── ...
-└── ios-app/
+   backend/Dockerfile        ← NO debe estar ignorado
+   backend/requirements.txt  ← NO debe estar ignorado
+   backend/app/*.py          ← NO debe estar ignorado

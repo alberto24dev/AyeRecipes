@@ -22,6 +22,7 @@ backend/AyeRecipes/
 # Ignorar recursos y assets
 assets/
 ios-app/AyeRecipes/Assets.xcassets/
+AyeRecipes-Start.command
 
 # Ignorar archivos de proyecto de Xcode
 ios-app/AyeRecipes.xcodeproj/

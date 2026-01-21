@@ -66,33 +66,6 @@ Thumbs.db
 - ❌ `venv/` (entorno virtual)
 - ❌ Archivos de usuario de Xcode
 
-## Archivo `.dockerignore` (para optimizar el build de Docker):
-
-Crea este archivo en `backend/.dockerignore`:
-```
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv
-.env
-.git
-.gitignore
-*.log
-*.sqlite
-*.db
-.DS_Store
-.vscode
-.idea
-*.swp
-AyeRecipes/
-```
-
-## Estructura final que se subirá a GitHub:
-```
 AYERECIPES/
 ├── .gitignore                    ✅ Se sube
 ├── backend/

@@ -5,6 +5,9 @@ __pycache__/
 *.so
 .Python
 
+# Starter command
+AyeRecipes-start.command
+
 # Entornos virtuales
 env/
 venv/
@@ -49,37 +52,3 @@ DerivedData/
 # Archivos de sistema
 .DS_Store
 Thumbs.db
-```
-
-## ✅ Lo que SÍ se subirá (necesario para Docker):
-
-- ✅ `backend/Dockerfile`
-- ✅ `backend/.dockerignore`
-- ✅ `backend/requirements.txt`
-- ✅ `backend/app/*.py` (todos tus archivos Python)
-- ✅ `ios-app/**/*.swift` (tus archivos Swift)
-
-## ❌ Lo que NO se subirá (correcto):
-
-- ❌ `.env` (credenciales sensibles)
-- ❌ `__pycache__/` (archivos compilados)
-- ❌ `venv/` (entorno virtual)
-- ❌ Archivos de usuario de Xcode
-
-AYERECIPES/
-├── .gitignore                    ✅ Se sube
-├── backend/
-│   ├── Dockerfile                ✅ Se sube (NECESARIO)
-│   ├── .dockerignore             ✅ Se sube (NECESARIO)
-│   ├── requirements.txt          ✅ Se sube (NECESARIO)
-│   ├── .env                      ❌ NO se sube (CORRECTO)
-│   └── app/
-│       ├── main.py               ✅ Se sube
-│       ├── auth.py               ✅ Se sube
-│       ├── routes.py             ✅ Se sube
-│       ├── models.py             ✅ Se sube
-│       └── database.py           ✅ Se sube
-└── ios-app/
-    └── AyeRecipes/
-        ├── *.swift               ✅ Se sube
-        └── Assets.xcassets/      ❌ NO se sube (opcional)

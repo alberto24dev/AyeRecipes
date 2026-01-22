@@ -11,6 +11,15 @@ from app.auth import get_current_user
 # Creamos el enrutador
 router = APIRouter()
 
+# --- Endpoint de Ping ---
+
+@router.get("/ping", tags=["Test"])
+async def ping():
+    """
+    Endpoint de prueba para verificar que la API está funcionando.
+    """
+    return {"message": "Pong!"}
+
 # --- Endpoint de Prueba solicitado ---
 @router.get("/db-test", tags=["Test"])
 async def test_db_connection():

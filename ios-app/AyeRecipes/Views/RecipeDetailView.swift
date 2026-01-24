@@ -7,6 +7,16 @@ struct RecipeDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // Image
+                if recipe.imageUrl != nil {
+                    RemoteImage(url: recipe.imageUrl)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 250)
+                        .clipped()
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                }
+                
                 // Title and Description
                 VStack(alignment: .leading, spacing: 8) {
                     Text(recipe.title)
@@ -88,6 +98,7 @@ struct RecipeDetailView: View {
         description: "A delicious classic Italian pasta with egg, pecorino cheese, guanciale and black pepper.",
         ingredients: ["Spaghetti", "Eggs", "Pecorino Cheese", "Guanciale", "Black Pepper"],
         steps: ["Boil water", "Cook pasta", "Prepare sauce", "Mix everything"],
+        imageUrl: nil,
         userId: "user1",
         createdAt: nil
     ))

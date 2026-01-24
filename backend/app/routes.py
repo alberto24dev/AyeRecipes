@@ -3,10 +3,12 @@ from fastapi.responses import Response
 from typing import List
 from bson import ObjectId
 from pymongo import ReturnDocument
+from pydantic import BaseModel
 
 from app.database import recipe_collection, user_collection
 from app.models import RecipeModel, UpdateRecipeModel
 from app.auth import get_current_user
+from app.s3_client import create_presigned_put_url, create_presigned_get_url, delete_image_from_s3
 
 # Creamos el enrutador
 router = APIRouter()
@@ -19,6 +21,20 @@ async def ping():
     Endpoint de prueba para verificar que la API está funcionando.
     """
     return {"message": "Pong!"}
+
+class PresignRequest(BaseModel):
+    fileName: str
+    contentType: str
+
+
+@router.post("/recipes/presigned-url", tags=["Recipes"])
+async def generate_presigned_url(payload: PresignRequest, current_user_email: str = Depends(get_current_user)):
+    """Generate a short-lived presigned URL for uploading an image to S3."""
+    try:
+        _, upload_url, file_url = create_presigned_put_url(payload.fileName, payload.contentType)
+        return {"uploadUrl": upload_url, "fileUrl": file_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not generate upload URL: {e}")
 
 # --- Endpoint de Prueba solicitado ---
 @router.get("/db-test", tags=["Test"])
@@ -72,6 +88,16 @@ async def list_recipes(current_user_email: str = Depends(get_current_user)):
     
     # Filtrar recetas por user_id
     recipes = await recipe_collection.find({"user_id": user["_id"]}).to_list(100)
+    
+    # Convertir las URLs de S3 a URLs pre-firmadas
+    for recipe in recipes:
+        if recipe.get("image_url"):
+            try:
+                recipe["image_url"] = create_presigned_get_url(recipe["image_url"])
+            except Exception as e:
+                print(f"Error generando URL pre-firmada: {e}")
+                # Si falla, mantener la URL original
+    
     return recipes
 
 @router.get("/recipes/{id}", response_description="Obtener una receta", response_model=RecipeModel)
@@ -83,6 +109,12 @@ async def show_recipe(id: str):
          raise HTTPException(status_code=400, detail="ID no válido")
          
     if (recipe := await recipe_collection.find_one({"_id": ObjectId(id)})) is not None:
+        # Convertir la URL de S3 a URL pre-firmada
+        if recipe.get("image_url"):
+            try:
+                recipe["image_url"] = create_presigned_get_url(recipe["image_url"])
+            except Exception as e:
+                print(f"Error generando URL pre-firmada: {e}")
         return recipe
 
     raise HTTPException(status_code=404, detail=f"Receta {id} no encontrada")
@@ -116,11 +148,21 @@ async def update_recipe(id: str, recipe: UpdateRecipeModel = Body(...)):
 @router.delete("/recipes/{id}", response_description="Eliminar receta")
 async def delete_recipe(id: str):
     """
-    Elimina una receta por ID.
+    Elimina una receta por ID y su imagen asociada de S3.
     """
     if not ObjectId.is_valid(id):
          raise HTTPException(status_code=400, detail="ID no válido")
-         
+    
+    # Obtener la receta primero para conseguir la URL de la imagen
+    recipe = await recipe_collection.find_one({"_id": ObjectId(id)})
+    if not recipe:
+        raise HTTPException(status_code=404, detail=f"Receta {id} no encontrada")
+    
+    # Eliminar la imagen de S3 si existe
+    if recipe.get("image_url"):
+        delete_image_from_s3(recipe["image_url"])
+    
+    # Eliminar la receta de la base de datos
     delete_result = await recipe_collection.delete_one({"_id": ObjectId(id)})
 
     if delete_result.deleted_count == 1:

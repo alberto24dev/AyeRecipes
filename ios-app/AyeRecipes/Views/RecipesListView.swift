@@ -13,26 +13,37 @@ struct RecipesListView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                List {
-                    ForEach(recipeService.recipes) { recipe in
-                        NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                            VStack(alignment: .leading) {
-                                Text(recipe.title)
-                                    .font(.headline)
-                                if let description = recipe.description {
-                                    Text(description)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
+                if recipeService.recipes.isEmpty && !recipeService.isLoading {
+                    ScrollView {
+                        VStack {
+                            ContentUnavailableView("No recipes", systemImage: "fork.knife", description: Text("Create your first recipe to see it here"))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .navigationTitle("My Recipes")
+                    .refreshable {
+                        await recipeService.fetchRecipes()
+                    }
+                } else {
+                    List {
+                        ForEach(recipeService.recipes) { recipe in
+                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                                VStack(alignment: .leading) {
+                                    Text(recipe.title)
+                                        .font(.headline)
+                                    if let description = recipe.description {
+                                        Text(description)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
+                        .onDelete(perform: deleteRecipe)
                     }
-                    .onDelete(perform: deleteRecipe)
-                }
-                .navigationTitle("My Recipes")
-                .overlay {
-                    if recipeService.recipes.isEmpty && !recipeService.isLoading {
-                        ContentUnavailableView("No recipes", systemImage: "fork.knife", description: Text("Create your first recipe to see it here"))
+                    .navigationTitle("My Recipes")
+                    .refreshable {
+                        await recipeService.fetchRecipes()
                     }
                 }
                 

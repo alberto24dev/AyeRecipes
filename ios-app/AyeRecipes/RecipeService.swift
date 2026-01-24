@@ -14,6 +14,11 @@ class RecipeService: ObservableObject {
     private var authToken: String? {
         UserDefaults.standard.string(forKey: "authToken")
     }
+
+    private struct PresignedURLResponse: Codable {
+        let uploadUrl: String
+        let fileUrl: String
+    }
     
     func fetchRecipes() async {
         isLoading = true
@@ -31,26 +36,110 @@ class RecipeService: ObservableObject {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             
-            let (data, _) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Verificar status code
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 401 {
+                    errorMessage = "Session expired. Please login again."
+                    isLoading = false
+                    return
+                } else if !(200...299).contains(httpResponse.statusCode) {
+                    errorMessage = "Error: HTTP \(httpResponse.statusCode)"
+                    isLoading = false
+                    return
+                }
+            }
+            
             let decodedRecipes = try JSONDecoder().decode([Recipe].self, from: data)
             self.recipes = decodedRecipes
+        } catch is CancellationError {
+            // Ignorar errores de cancelación (pull to refresh puede ser cancelado)
+            print("Recipe fetch was cancelled")
         } catch {
             print("Error fetching recipes: \(error)")
-            self.errorMessage = "Error loading recipes: \(error.localizedDescription)"
+            errorMessage = "Error loading recipes: \(error.localizedDescription)"
         }
         
         isLoading = false
     }
+
+    private func uploadImageToS3(imageData: Data, mimeType: String) async -> String? {
+        struct PresignRequest: Codable {
+            let fileName: String
+            let contentType: String
+        }
+
+        let fileExtension = mimeType.contains("png") ? "png" : "jpg"
+        let fileName = "recipe-" + UUID().uuidString + "." + fileExtension
+
+        guard let presignURL = URL(string: "\(baseURL)/recipes/presigned-url") else {
+            return nil
+        }
+
+        var request = URLRequest(url: presignURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let payload = PresignRequest(fileName: fileName, contentType: mimeType)
+            request.httpBody = try JSONEncoder().encode(payload)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                print("Failed to get presigned URL. Status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+                if let errorData = try? JSONDecoder().decode([String: String].self, from: data) {
+                    print("Error details: \(errorData)")
+                }
+                return nil
+            }
+
+            let presigned = try JSONDecoder().decode(PresignedURLResponse.self, from: data)
+            guard let uploadURL = URL(string: presigned.uploadUrl) else { return nil }
+
+            var putRequest = URLRequest(url: uploadURL)
+            putRequest.httpMethod = "PUT"
+            putRequest.httpBody = imageData
+            putRequest.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+
+            let (_, putResponse) = try await URLSession.shared.data(for: putRequest)
+            guard let putHttp = putResponse as? HTTPURLResponse, (200...299).contains(putHttp.statusCode) else {
+                let statusCode = (putResponse as? HTTPURLResponse)?.statusCode ?? -1
+                print("Failed to upload to S3. Status: \(statusCode)")
+                return nil
+            }
+
+            return presigned.fileUrl
+        } catch {
+            print("Error uploading image: \(error)")
+            return nil
+        }
+    }
     
-    func createRecipe(title: String, description: String, ingredients: [String], steps: [String]) async -> Bool {
+    func createRecipe(title: String, description: String, ingredients: [String], steps: [String], imageData: Data? = nil, imageMimeType: String? = nil) async -> Bool {
         guard let url = URL(string: "\(baseURL)/recipes") else { return false }
         
+        var imageUrl: String? = nil
+        if let imageData = imageData {
+            let mimeType = imageMimeType ?? "image/jpeg"
+            imageUrl = await uploadImageToS3(imageData: imageData, mimeType: mimeType)
+            if imageUrl == nil {
+                self.errorMessage = "Could not upload image"
+                return false
+            }
+        }
+
         let newRecipe = Recipe(
             id: nil,
             title: title,
             description: description,
             ingredients: ingredients,
             steps: steps,
+            imageUrl: imageUrl,
             userId: nil,
             createdAt: nil
         )

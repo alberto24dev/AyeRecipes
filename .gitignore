@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
 
 # Starter command
 AyeRecipes-start.command
@@ -14,6 +17,7 @@ venv/
 .venv
 ENV/
 backend/AyeRecipes/
+backend/ARV/
 
 # Variables de entorno (IMPORTANTE: nunca subir .env)
 .env
@@ -34,6 +38,8 @@ backend/AyeRecipes/
 *.swp
 *.swo
 .DS_Store
+*.sublime-project
+*.sublime-workspace
 
 # Xcode
 ios-app/AyeRecipes.xcodeproj/xcuserdata/
@@ -45,10 +51,12 @@ DerivedData/
 *.ipa
 *.dSYM.zip
 *.dSYM
-
-# Assets grandes (opcional, depende de tu proyecto)
-# ios-app/AyeRecipes/Assets.xcassets/
+build/
 
 # Archivos de sistema
 .DS_Store
 Thumbs.db
+
+# Archivos generados por iOS
+*.swiftpm/
+.swiftpm/

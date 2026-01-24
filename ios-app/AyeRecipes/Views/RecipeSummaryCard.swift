@@ -9,12 +9,14 @@ import SwiftUI
 
 struct RecipeSummaryCard: View {
     let title: String
+    let imageUrl: String?
     
     var body: some View {
-        VStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 1.0, green: 0.27, blue: 0.0).opacity(0.3))
-                .frame(height: 100)
+        VStack(alignment: .leading, spacing: 0) {
+            RemoteImage(url: imageUrl)
+                .frame(width: 160, height: 100)
+                .clipped()
+            
             Text(title)
                 .font(.headline)
                 .lineLimit(1)
@@ -29,5 +31,5 @@ struct RecipeSummaryCard: View {
 }
 
 #Preview {
-    RecipeSummaryCard(title: "Pasta Carbonara")
+    RecipeSummaryCard(title: "Pasta Carbonara", imageUrl: nil)
 }

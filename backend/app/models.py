@@ -12,6 +12,7 @@ class RecipeModel(BaseModel):
     description: Optional[str] = None
     ingredients: List[str] = []
     steps: List[str] = []
+    image_url: Optional[str] = None
     user_id: Optional[PyObjectId] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -31,6 +32,7 @@ class UpdateRecipeModel(BaseModel):
     description: Optional[str] = None
     ingredients: Optional[List[str]] = None
     steps: Optional[List[str]] = None
+    image_url: Optional[str] = None
 
 # --- Modelos de Autenticación ---
 

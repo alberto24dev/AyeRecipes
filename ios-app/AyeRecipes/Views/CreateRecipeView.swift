@@ -6,6 +6,53 @@
 //
 
 import SwiftUI
+import PhotosUI
+import UIKit
+
+// MARK: - Camera Picker
+struct CameraPicker: UIViewControllerRepresentable {
+    @Environment(\.dismiss) var dismiss
+    @Binding var image: Image?
+    @Binding var imageData: Data?
+    @Binding var mimeType: String
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraPicker
+        
+        init(_ parent: CameraPicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = Image(uiImage: uiImage)
+                // Convertir a JPEG con compresión
+                if let jpegData = uiImage.jpegData(compressionQuality: 0.8) {
+                    parent.imageData = jpegData
+                    parent.mimeType = "image/jpeg"
+                }
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
 
 struct RecipeStepItem: Identifiable, Hashable, Codable {
     let id: UUID
@@ -50,6 +97,11 @@ struct CreateRecipeView: View {
     
     @State private var title = ""
     @State private var description = ""
+
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedImage: Image?
+    @State private var selectedImageData: Data?
+    @State private var selectedImageMimeType = "image/jpeg"
     
     @State private var newIngredientName = ""
     @State private var newIngredientQuantity = ""
@@ -68,10 +120,54 @@ struct CreateRecipeView: View {
     @State private var showEditConfirmation = false
     @State private var lastEditMode: EditMode = .inactive
     
+    @State private var showImageOptions = false
+    @State private var showCamera = false
+    
     var body: some View {
         NavigationView {
             ZStack {
                 Form {
+                    Section(header: Text("Image")) {
+                        Button(action: { showImageOptions = true }) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(.secondarySystemBackground))
+                                if let image = selectedImage {
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "photo")
+                                            .font(.title2)
+                                            .foregroundStyle(.secondary)
+                                        Text("Add a cover photo")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [6]))
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        if selectedImage != nil {
+                            Button(role: .destructive) {
+                                selectedItem = nil
+                                selectedImage = nil
+                                selectedImageData = nil
+                                selectedImageMimeType = "image/jpeg"
+                            } label: {
+                                Text("Remove image")
+                            }
+                        }
+                    }
+
                     Section(header: Text("Information")) {
                         TextField("Recipe Title", text: $title)
                         TextField("Short description", text: $description, axis: .vertical)
@@ -228,6 +324,34 @@ struct CreateRecipeView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .navigationTitle("Create Recipe")
+                .confirmationDialog("Add Photo", isPresented: $showImageOptions) {
+                    Button("Take Photo") {
+                        showCamera = true
+                    }
+                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                        Text("Choose from Library")
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
+                .sheet(isPresented: $showCamera) {
+                    CameraPicker(image: $selectedImage, imageData: $selectedImageData, mimeType: $selectedImageMimeType)
+                }
+                .onChange(of: selectedItem, initial: false) { _, newValue in
+                    guard let newValue else { return }
+                    Task {
+                        do {
+                            if let data = try await newValue.loadTransferable(type: Data.self) {
+                                selectedImageData = data
+                                selectedImageMimeType = newValue.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+                                if let uiImage = UIImage(data: data) {
+                                    selectedImage = Image(uiImage: uiImage)
+                                }
+                            }
+                        } catch {
+                            print("Error loading image: \(error)")
+                        }
+                    }
+                }
                 
                 // Overlay de resultado (Éxito o Error)
                 if showResultOverlay {
@@ -306,7 +430,9 @@ struct CreateRecipeView: View {
                 title: title,
                 description: description,
                 ingredients: ingredients.map { "\($0.quantity) \($0.unit) \($0.name)" },
-                steps: steps.map { $0.text }
+                steps: steps.map { $0.text },
+                imageData: selectedImageData,
+                imageMimeType: selectedImageMimeType
             )
             
             isSaving = false
@@ -319,6 +445,10 @@ struct CreateRecipeView: View {
                 steps = []
                 newIngredientName = ""
                 newIngredientQuantity = ""
+                selectedImage = nil
+                selectedImageData = nil
+                selectedItem = nil
+                selectedImageMimeType = "image/jpeg"
             }
             
             withAnimation {

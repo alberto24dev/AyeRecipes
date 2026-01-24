@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var recipeService: RecipeService
+    @State private var showOverlayMessage = false
     
     var body: some View {
         NavigationView {
@@ -30,7 +31,7 @@ struct HomeView: View {
                             HStack(spacing: 15) {
                                 ForEach(recipeService.recipes.prefix(5)) { recipe in
                                     NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                                        RecipeSummaryCard(title: recipe.title)
+                                        RecipeSummaryCard(title: recipe.title, imageUrl: recipe.imageUrl)
                                     }
                                     .buttonStyle(PlainButtonStyle())
                                 }
@@ -53,14 +54,12 @@ struct HomeView: View {
                     VStack(spacing: 16) {
                         ForEach(recipeService.recipes.prefix(3)) { recipe in
                             NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                                HStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.gray.opacity(0.3))
+                                HStack(spacing: 12) {
+                                    RemoteImage(url: recipe.imageUrl)
                                         .frame(width: 60, height: 60)
-                                        .overlay {
-                                            Image(systemName: "fork.knife")
-                                                .foregroundStyle(.white)
-                                        }
+                                        .clipped()
+                                        .cornerRadius(8)
+                                    
                                     VStack(alignment: .leading) {
                                         Text(recipe.title)
                                             .font(.subheadline)
@@ -87,19 +86,16 @@ struct HomeView: View {
             }
             
             // Overlay de mensajes (Éxito o Error)
-            if let message = recipeService.successMessage ?? recipeService.errorMessage {
+            if showOverlayMessage, let message = recipeService.successMessage ?? recipeService.errorMessage {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                     .transition(.opacity)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             withAnimation {
-                                if recipeService.successMessage != nil {
-                                    recipeService.successMessage = nil
-                                }
-                                if recipeService.errorMessage != nil {
-                                    recipeService.errorMessage = nil
-                                }
+                                showOverlayMessage = false
+                                recipeService.successMessage = nil
+                                recipeService.errorMessage = nil
                             }
                         }
                     }
@@ -132,6 +128,21 @@ struct HomeView: View {
             }
             .refreshable {
                 await recipeService.fetchRecipes()
+            }
+            .onChange(of: recipeService.successMessage) { _, newValue in
+                if newValue != nil {
+                    withAnimation {
+                        showOverlayMessage = true
+                    }
+                }
+            }
+            .onChange(of: recipeService.errorMessage) { _, newValue in
+                // Solo mostrar error en overlay si NO es un error de fetch normal
+                if newValue != nil && !recipeService.isLoading {
+                    withAnimation {
+                        showOverlayMessage = true
+                    }
+                }
             }
         }
     }

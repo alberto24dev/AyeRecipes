@@ -6,6 +6,7 @@ struct Recipe: Identifiable, Codable {
     let description: String?
     let ingredients: [String]
     let steps: [String]
+    let imageUrl: String?
     let userId: String?
     
     // El backend devuelve esto como string en formato ISO o null
@@ -19,6 +20,7 @@ struct Recipe: Identifiable, Codable {
         case description
         case ingredients
         case steps
+        case imageUrl = "image_url"
         case userId = "user_id"
         case createdAt = "created_at"
     }

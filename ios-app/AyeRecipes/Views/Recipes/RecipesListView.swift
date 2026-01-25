@@ -2,6 +2,9 @@
 //  RecipesListView.swift
 //  AyeRecipes
 //
+//  Versión Mejorada: Integra optimizaciones de lazy loading y mejor rendimiento
+//  Combina funcionalidad de RecipesListView + OptimizedRecipesList
+//
 //  Created by Jose Alberto Montero Martinez on 1/12/26.
 //
 
@@ -9,14 +12,25 @@ import SwiftUI
 
 struct RecipesListView: View {
     @EnvironmentObject var recipeService: RecipeService
+    @ObservedObject private var hapticManager = HapticManager.shared
     
     var body: some View {
         NavigationView {
             ZStack {
                 if recipeService.recipes.isEmpty && !recipeService.isLoading {
                     ScrollView {
-                        VStack {
+                        VStack(spacing: 16) {
                             ContentUnavailableView("No recipes", systemImage: "fork.knife", description: Text("Create your first recipe to see it here"))
+                            
+                            NavigationLink(destination: CreateRecipeView()) {
+                                Label("Create First Recipe", systemImage: "plus.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.accentColor)
+                                    .foregroundStyle(.white)
+                                    .cornerRadius(8)
+                                    .padding()
+                            }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -26,20 +40,43 @@ struct RecipesListView: View {
                     }
                 } else {
                     List {
-                        ForEach(recipeService.recipes) { recipe in
-                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                                VStack(alignment: .leading) {
-                                    Text(recipe.title)
-                                        .font(.headline)
-                                    if let description = recipe.description {
-                                        Text(description)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
+                        if recipeService.isLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                        } else {
+                            ForEach(recipeService.recipes) { recipe in
+                                NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 12) {
+                                            // Lazy load de imagen
+                                            RemoteImage(url: recipe.imageUrl)
+                                                .frame(width: 60, height: 60)
+                                                .cornerRadius(6)
+                                                .clipped()
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(recipe.title)
+                                                    .font(.headline)
+                                                    .lineLimit(1)
+                                                
+                                                if let description = recipe.description {
+                                                    Text(description)
+                                                        .font(.subheadline)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(2)
+                                                }
+                                            }
+                                            Spacer()
+                                        }
                                     }
+                                    .padding(.vertical, 4)
                                 }
                             }
+                            .onDelete(perform: deleteRecipe)
                         }
-                        .onDelete(perform: deleteRecipe)
                     }
                     .navigationTitle("My Recipes")
                     .refreshable {
@@ -87,8 +124,8 @@ struct RecipesListView: View {
                     .zIndex(100)
                 }
             }
-            .onAppear {
-                Task {
+            .task {
+                if recipeService.recipes.isEmpty {
                     await recipeService.fetchRecipes()
                 }
             }
@@ -96,16 +133,22 @@ struct RecipesListView: View {
     }
     
     func deleteRecipe(at offsets: IndexSet) {
+        hapticManager.playSelection()
         let recipesToDelete = offsets.map { recipeService.recipes[$0] }
         Task {
             var anyError = false
             for recipe in recipesToDelete {
                 if let id = recipe.id {
                     let success = await recipeService.deleteRecipe(id: id)
-                    if !success { anyError = true }
+                    if !success {
+                        anyError = true
+                    } else {
+                        hapticManager.playSuccess()
+                    }
                 }
             }
             if anyError {
+                hapticManager.playError()
                 recipeService.errorMessage = "One or more recipes could not be deleted."
             }
         }

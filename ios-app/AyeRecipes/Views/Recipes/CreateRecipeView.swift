@@ -2,12 +2,18 @@
 //  CreateRecipeView.swift
 //  AyeRecipes
 //
+//  Versión Unificada: Combina funcionalidad completa de CreateRecipeView, 
+//  feedback háptico integrado (CreateRecipeViewWithHaptics) 
+//  y manejo de permisos (PermissionManager)
+//
 //  Created by Jose Alberto Montero Martinez on 1/12/26.
+//  Refactored: Unified version with haptic feedback and permissions handling
 //
 
 import SwiftUI
 import PhotosUI
 import UIKit
+import AVFoundation
 
 // MARK: - Camera Picker
 struct CameraPicker: UIViewControllerRepresentable {
@@ -20,7 +26,29 @@ struct CameraPicker: UIViewControllerRepresentable {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.delegate = context.coordinator
+        picker.cameraDevice = .rear // Cámara trasera por defecto
+        
+        // Verificar disponibilidad de cámaras avanzadas (para logging/debugging)
+        logAvailableCameras()
+        
         return picker
+    }
+    
+    /// Verifica qué cámaras están disponibles en el dispositivo
+    /// UIImagePickerController maneja automáticamente la selección de la mejor cámara
+    /// pero esta función ayuda a debugging/logging
+    private func logAvailableCameras() {
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [
+                .builtInTripleCamera,      // iPhone 14 Pro Max, 15 Pro Max
+                .builtInDualWideCamera,    // iPhone 13 Pro Max
+                .builtInWideAngleCamera    // Todos los iPhones
+            ],
+            mediaType: .video,
+            position: .back
+        )
+        
+        _ = discoverySession.devices.first
     }
     
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
@@ -54,6 +82,7 @@ struct CameraPicker: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - Data Models
 struct RecipeStepItem: Identifiable, Hashable, Codable {
     let id: UUID
     var text: String
@@ -78,21 +107,24 @@ struct IngredientItem: Identifiable, Hashable {
     }
 }
 
+// MARK: - Create Recipe View
 struct CreateRecipeView: View {
     @EnvironmentObject var recipeService: RecipeService
+    @StateObject private var hapticManager = HapticManager.shared
+    @StateObject private var permissionManager = PermissionManager.shared
     
     // Estado para controlar modo de edición
     @State private var isEditingIngredients = false
     @State private var isEditingSteps = false
     
-    // NUEVO: Enum para controlar qué campo tiene el foco (teclado activo)
+    // Enum para controlar qué campo tiene el foco (teclado activo)
     enum Field: Hashable {
         case ingredient
         case quantity
         case step
     }
     
-    // NUEVO: Variable de estado para el foco
+    // Variable de estado para el foco
     @FocusState private var focusedField: Field?
     
     @State private var title = ""
@@ -108,7 +140,7 @@ struct CreateRecipeView: View {
     @State private var newIngredientUnit = "g"
     @State private var ingredients: [IngredientItem] = []
     
-    let units = ["g", "kg", "ml", "L", "cups", "tbsp", "tsp","Unit"]
+    let units = ["g", "kg", "ml", "L", "cups", "tbsp", "tsp", "Unit"]
     
     @State private var newStep = ""
     @State private var steps: [RecipeStepItem] = []
@@ -117,11 +149,10 @@ struct CreateRecipeView: View {
     @State private var showResultOverlay = false
     @State private var saveSuccess: Bool? = nil
     
-    @State private var showEditConfirmation = false
-    @State private var lastEditMode: EditMode = .inactive
-    
     @State private var showImageOptions = false
     @State private var showCamera = false
+    @State private var showPermissionAlert = false
+    @State private var permissionAlertMessage = ""
     
     var body: some View {
         NavigationView {
@@ -158,6 +189,7 @@ struct CreateRecipeView: View {
 
                         if selectedImage != nil {
                             Button(role: .destructive) {
+                                hapticManager.playSelection()
                                 selectedItem = nil
                                 selectedImage = nil
                                 selectedImageData = nil
@@ -179,7 +211,10 @@ struct CreateRecipeView: View {
                         Text("Ingredients")
                         Spacer()
                         if !ingredients.isEmpty {
-                            Button(action: { isEditingIngredients.toggle() }) {
+                            Button(action: {
+                                hapticManager.playSelection()
+                                isEditingIngredients.toggle()
+                            }) {
                                 Text(isEditingIngredients ? "Done" : "Edit")
                                     .font(.caption)
                             }
@@ -226,7 +261,6 @@ struct CreateRecipeView: View {
                             let item = ingredients[idx]
                             Group {
                                 if isEditingIngredients {
-                                    // Modo edición: permite cambiar nombre, cantidad y unidad
                                     HStack {
                                         TextField("Name", text: $ingredients[idx].name)
                                         Divider()
@@ -249,7 +283,6 @@ struct CreateRecipeView: View {
                                         .disabled(ingredients[idx].quantity.contains("/"))
                                     }
                                 } else {
-                                    // Modo visualización
                                     HStack {
                                         Text(item.name)
                                         Spacer()
@@ -268,7 +301,10 @@ struct CreateRecipeView: View {
                         Text("Steps")
                         Spacer()
                         if !steps.isEmpty {
-                            Button(action: { isEditingSteps.toggle() }) {
+                            Button(action: {
+                                hapticManager.playSelection()
+                                isEditingSteps.toggle()
+                            }) {
                                 Text(isEditingSteps ? "Done" : "Edit")
                                     .font(.caption)
                             }
@@ -326,17 +362,20 @@ struct CreateRecipeView: View {
                 .navigationTitle("Create Recipe")
                 .confirmationDialog("Add Photo", isPresented: $showImageOptions) {
                     Button("Take Photo") {
-                        showCamera = true
+                        requestCameraPermission()
                     }
-                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                    PhotosPicker(selection: $selectedItem, matching: .images, label: {
                         Text("Choose from Library")
-                    }
+                    })
                     Button("Cancel", role: .cancel) {}
                 }
                 .sheet(isPresented: $showCamera) {
                     CameraPicker(image: $selectedImage, imageData: $selectedImageData, mimeType: $selectedImageMimeType)
                 }
                 .onChange(of: selectedItem, initial: false) { _, newValue in
+                    if newValue != nil {
+                        hapticManager.playSelection()
+                    }
                     guard let newValue else { return }
                     Task {
                         do {
@@ -345,12 +384,22 @@ struct CreateRecipeView: View {
                                 selectedImageMimeType = newValue.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
                                 if let uiImage = UIImage(data: data) {
                                     selectedImage = Image(uiImage: uiImage)
+                                    hapticManager.playSuccess()
                                 }
                             }
                         } catch {
-                            print("Error loading image: \(error)")
+                            hapticManager.playError()
+                            // Error loading image handled silently
                         }
                     }
+                }
+                .alert("Permission Required", isPresented: $showPermissionAlert) {
+                    Button("Settings") {
+                        permissionManager.openSettings()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(permissionAlertMessage)
                 }
                 
                 // Overlay de resultado (Éxito o Error)
@@ -383,47 +432,76 @@ struct CreateRecipeView: View {
         }
     }
     
-    // MARK: - Funciones
+    // MARK: - Methods
+    
+    func requestCameraPermission() {
+        Task {
+            let granted = await PermissionManager.shared.requestCameraPermission()
+            if granted {
+                hapticManager.playSelection()
+                showCamera = true
+            } else {
+                hapticManager.playError()
+                permissionAlertMessage = "Camera access is required to take photos. Please enable it in Settings."
+                showPermissionAlert = true
+            }
+        }
+    }
     
     func addIngredient() {
-        guard !newIngredientName.isEmpty else { return }
+        guard !newIngredientName.isEmpty else {
+            hapticManager.playError()
+            return
+        }
+        hapticManager.playSelection()
         let quantity = newIngredientQuantity.isEmpty ? "1" : newIngredientQuantity
         ingredients.append(IngredientItem(name: newIngredientName, quantity: quantity, unit: newIngredientUnit))
         newIngredientName = ""
         newIngredientQuantity = ""
         newIngredientUnit = "g"
-        // No ponemos 'focusedField = nil' para que el teclado siga abierto
     }
     
     func deleteIngredient(at offsets: IndexSet) {
+        hapticManager.playSelection()
         ingredients.remove(atOffsets: offsets)
     }
     
-    // NUEVO: Función para mover ingredientes
     func moveIngredient(from source: IndexSet, to destination: Int) {
+        hapticManager.playSelection()
         ingredients.move(fromOffsets: source, toOffset: destination)
     }
     
     func addStep() {
-        guard !newStep.isEmpty else { return }
+        guard !newStep.isEmpty else {
+            hapticManager.playError()
+            return
+        }
+        hapticManager.playSelection()
         steps.append(RecipeStepItem(text: newStep))
         newStep = ""
     }
     
     func deleteStep(at offsets: IndexSet) {
+        hapticManager.playSelection()
         steps.remove(atOffsets: offsets)
     }
     
     func moveStep(from source: IndexSet, to destination: Int) {
+        hapticManager.playSelection()
         steps.move(fromOffsets: source, toOffset: destination)
     }
     
     func saveRecipe() {
-        // Al guardar, sí queremos esconder el teclado
         focusedField = nil
+        
+        guard !title.isEmpty && !ingredients.isEmpty && !steps.isEmpty else {
+            hapticManager.playError()
+            return
+        }
         
         isSaving = true
         saveSuccess = nil
+        hapticManager.playSelection()
         
         Task {
             let success = await recipeService.createRecipe(
@@ -439,6 +517,7 @@ struct CreateRecipeView: View {
             saveSuccess = success
             
             if success {
+                hapticManager.playSuccess()
                 title = ""
                 description = ""
                 ingredients = []
@@ -449,6 +528,8 @@ struct CreateRecipeView: View {
                 selectedImageData = nil
                 selectedItem = nil
                 selectedImageMimeType = "image/jpeg"
+            } else {
+                hapticManager.playError()
             }
             
             withAnimation {

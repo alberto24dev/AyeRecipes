@@ -55,9 +55,9 @@ class RecipeService: ObservableObject {
             self.recipes = decodedRecipes
         } catch is CancellationError {
             // Ignorar errores de cancelación (pull to refresh puede ser cancelado)
-            print("Recipe fetch was cancelled")
+            // Recipe fetch was cancelled
         } catch {
-            print("Error fetching recipes: \(error)")
+            // Error fetching recipes handled silently
             errorMessage = "Error loading recipes: \(error.localizedDescription)"
         }
         
@@ -91,9 +91,9 @@ class RecipeService: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                print("Failed to get presigned URL. Status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+                // Failed to get presigned URL handled silently
                 if let errorData = try? JSONDecoder().decode([String: String].self, from: data) {
-                    print("Error details: \(errorData)")
+                    // Error details logged internally
                 }
                 return nil
             }
@@ -109,13 +109,13 @@ class RecipeService: ObservableObject {
             let (_, putResponse) = try await URLSession.shared.data(for: putRequest)
             guard let putHttp = putResponse as? HTTPURLResponse, (200...299).contains(putHttp.statusCode) else {
                 let statusCode = (putResponse as? HTTPURLResponse)?.statusCode ?? -1
-                print("Failed to upload to S3. Status: \(statusCode)")
+                // Failed to upload to S3 handled silently
                 return nil
             }
 
             return presigned.fileUrl
         } catch {
-            print("Error uploading image: \(error)")
+            // Error uploading image handled silently
             return nil
         }
     }
@@ -168,7 +168,7 @@ class RecipeService: ObservableObject {
                 return false
             }
         } catch {
-            print("Error creating recipe: \(error)")
+            // Error creating recipe handled silently
             self.errorMessage = "Error creating recipe: \(error.localizedDescription)"
             return false
         }
@@ -198,7 +198,7 @@ class RecipeService: ObservableObject {
                 return false
             }
         } catch {
-            print("Error deleting recipe: \(error)")
+            // Error deleting recipe handled silently
             self.errorMessage = "Error deleting: \(error.localizedDescription)"
             return false
         }

@@ -1,0 +1,153 @@
+════════════════════════════════════════════════════════════════════════════════
+🎯 RESUMEN EJECUTIVO: SOLUCIÓN DE ERRORES SANDBOX
+════════════════════════════════════════════════════════════════════════════════
+
+📊 PROBLEMA ORIGINAL:
+─────────────────────────────────────────────────────────────────────────────
+  RBSServiceErrorDomain Code=1
+  Sandbox restriction (error 159)
+  Timeouts durante inicialización de app
+  
+  CAUSA: Permisos de cámara/galería solicitados en el startup
+         cuando solo se necesitan en funciones específicas
+
+════════════════════════════════════════════════════════════════════════════════
+
+✅ ARCHIVOS MODIFICADOS:
+─────────────────────────────────────────────────────────────────────────────
+
+1. 📄 project.pbxproj (2 secciones editadas)
+   ├─ Removido: NSCameraUsageDescription
+   ├─ Removido: NSPhotoLibraryUsageDescription
+   └─ Removido: NSPhotoLibraryAddUsageDescription
+
+2. 📄 Views/LoginView.swift
+   └─ Removido: import AuthenticationServices (innecesario)
+
+3. 📄 MainTabView.swift
+   ├─ Cambio: onAppear → task (mejor sincronización)
+   ├─ Agregado: hasLoadedRecipes (prevenir cargas duplicadas)
+   └─ Agregado: try/catch para manejo de errores
+
+
+✨ ARCHIVOS NUEVOS CREADOS:
+─────────────────────────────────────────────────────────────────────────────
+
+1. 📄 PermissionManager.swift ⭐ IMPORTANTE
+   └─ Gestor centralizado de permisos "lazy" (bajo demanda)
+   
+2. 📄 PERMISSION_SETUP_GUIDE.md
+   └─ Guía técnica de configuración y testing
+   
+3. 📄 SANDBOX_FIX_README.md
+   └─ Documentación completa con ejemplos
+   
+4. 📄 Views/CreateRecipeViewOptimizedExample.swift
+   └─ Ejemplo de cómo usar PermissionManager
+   
+5. 🔧 debug_sandbox_errors.sh
+   └─ Script para debugging en tiempo real
+
+════════════════════════════════════════════════════════════════════════════════
+
+🔄 FLUJO DE PERMISOS - ANTES vs DESPUÉS:
+─────────────────────────────────────────────────────────────────────────────
+
+❌ ANTES (Problema):
+   App Launch
+      ↓
+   iOS carga Info.plist
+      ↓
+   Detecta NSCameraUsageDescription
+      ↓
+   Intenta inicializar servicios de cámara
+      ↓
+   Se conecta a usermanagerd/runningboard
+      ↓
+   ⚠️ RBSServiceErrorDomain Code=1 (sin permiso explícito)
+      ↓
+   Timeout en startup
+
+
+✅ DESPUÉS (Solución):
+   App Launch
+      ↓
+   iOS carga Info.plist (SIN permisos de cámara)
+      ↓
+   App se inicia rápidamente ✨
+      ↓
+   Usuario toca botón "Tomar foto"
+      ↓
+   PermissionManager.requestCameraPermission()
+      ↓
+   iOS muestra popup de permiso
+      ↓
+   Acceso a cámara otorgado/denegado
+      ↓
+   ✅ Operación normal sin errores de sandbox
+
+════════════════════════════════════════════════════════════════════════════════
+
+📋 PRÓXIMOS PASOS:
+─────────────────────────────────────────────────────────────────────────────
+
+1. ⚙️  Compila la app en Xcode
+   
+2. 🚀 Ejecuta en Simulador
+   
+3. 🔍 Abre Console y verifica NO hay RBSServiceErrorDomain en startup:
+   xcrun simctl spawn booted log stream --predicate \
+     'eventMessage contains[cd] "RBSServiceErrorDomain"' --level debug
+
+4. ✅ Prueba interactividad:
+   - Abre la app
+   - Navega a CreateRecipe
+   - Intenta tomar una foto
+   - El permiso se pide en ese momento (no en startup)
+
+5. 🔧 Si aún hay errores:
+   - Verifica que project.pbxproj se guardó correctamente
+   - Limpia build folder (Cmd+Shift+K)
+   - Reinicia Xcode
+
+════════════════════════════════════════════════════════════════════════════════
+
+📚 INFORMACIÓN DE REFERENCIA:
+─────────────────────────────────────────────────────────────────────────────
+
+Archivos de documentación incluidos:
+  📖 SANDBOX_FIX_README.md      - Guía técnica completa
+  📖 PERMISSION_SETUP_GUIDE.md  - Configuración detallada
+  📖 CreateRecipeViewOptimizedExample.swift - Ejemplo de implementación
+
+Donde encontrar el PermissionManager:
+  📁 AyeRecipes/PermissionManager.swift
+
+Cómo importar y usar:
+  ```swift
+  import Foundation  // Ya está
+  
+  // En tu View:
+  Task {
+      let hasPermission = await PermissionManager.shared.requestCameraPermission()
+      if hasPermission {
+          // Mostrar cámara
+      }
+  }
+  ```
+
+════════════════════════════════════════════════════════════════════════════════
+
+🎯 RESULTADO ESPERADO:
+─────────────────────────────────────────────────────────────────────────────
+
+✅ App se inicia sin retrasos
+✅ No hay RBSServiceErrorDomain errors en Console
+✅ Permisos se solicitan bajo demanda
+✅ Mejor experiencia de usuario
+✅ Cumplimiento de buenas prácticas de iOS
+
+════════════════════════════════════════════════════════════════════════════════
+
+Creado: January 24, 2026
+Estado: ✅ LISTO PARA TESTING

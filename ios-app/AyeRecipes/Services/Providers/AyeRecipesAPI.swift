@@ -6,9 +6,9 @@ struct AyeRecipesAPI {
     // Para acceder al Mac (backend), a menudo funciona localhost.
     
     //production
-    static let baseURL = "https://ayerecipesapi.ayeapps.tech" + "/api"
+    //static let baseURL = "https://ayerecipesapi.ayeapps.tech" + "/api"
     
     //deploy
-    //static let baseURL = "https://fixedayerecipesapi.ayeapps.tech" + "/api"
+    static let baseURL = "https://fixedayerecipesapi.ayeapps.tech" + "/api"
         
 }
